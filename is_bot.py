@@ -33,16 +33,15 @@ def callback_handler(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         done_review_st2(call.message)
     elif call.data.startswith('send_review'):
-        base = sqlite3.connect('is_base.db')
-        cur = base.cursor()
-        cur.execute('UPDATE users SET review == ? WHERE id_tg == ? AND ven_code == ?', (True, call.message.chat.id, int(call.data[12:])))
-        mess = 'Ваша информация отправлена👍,'\
-                'ecли все указано верно вы получите кэшбэк в ближайшее время\n\n'\
-                'Всего Вам доброго и до новых встреч😊'
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id, mess, parse_mode = 'html')
-        data = cur.execute('SELECT ven_code, name, screenshot_id FROM users WHERE id_tg == ?', (call.message.chat.id, )).fetchone()
-        base.close()
+        with sqlite3.connect('is_base.db') as base:
+            cur = base.cursor()
+            cur.execute('UPDATE users SET review == ? WHERE id_tg == ? AND ven_code == ?', (True, call.message.chat.id, int(call.data[12:])))
+            mess = 'Ваша информация отправлена👍,'\
+                    'ecли все указано верно вы получите кэшбэк в ближайшее время\n\n'\
+                    'Всего Вам доброго и до новых встреч😊'
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.send_message(call.message.chat.id, mess, parse_mode = 'html')
+            data = cur.execute('SELECT ven_code, name, screenshot_id FROM users WHERE id_tg == ?', (call.message.chat.id, )).fetchone()
         mess = '<b>Отзыв о товаре</b>\n\n'\
                 f'Товар: <b>{data[0]}</b>\n'\
                 f'Покупатель: <b>{data[1]}</b>'
@@ -50,6 +49,7 @@ def callback_handler(call):
     elif call.data == 'change_screenshot':
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, 'Выберите и отправьте другой скриншот сюда.')
+        bot.register_next_step_handler(call.message, handle_screen)
     elif call.data == 'change_issue':
         bot.delete_message(call.message.chat.id, call.message.message_id)
         issue(call.message)
@@ -57,10 +57,9 @@ def callback_handler(call):
     elif call.data == 'send_issue':
         mess = 'Ваша информация была передана продавцу, спасибо!'
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text = mess, reply_markup=None)
-        base = sqlite3.connect('is_base.db')
-        cur = base.cursor()
-        data = cur.execute('SELECT name, ven_code, issue FROM users WHERE id_tg == ?', (call.message.chat.id, )).fetchone()
-        base.close()
+        with sqlite3.connect('is_base.db') as base:
+            cur = base.cursor()
+            data = cur.execute('SELECT name, ven_code, issue FROM users WHERE id_tg == ?', (call.message.chat.id, )).fetchone()
         mess = '<b>Вопрос/замечание о товаре</b>\n\n'\
                 f'Товар: <b>{data[1]}</b>\n'\
                 f'Покупатель: <b>{data[0]}</b>\n'\
@@ -92,6 +91,7 @@ def done_review(message):
             'В примере выше, Вы можете найти наглядную инструкцию, как найти отзыв, чтобы сделать скриншот.\n\n'\
             'Если вы сделали скриншот, отправьте его сюда.'
     bot.send_message(message.chat.id, mess, parse_mode = 'html')
+    bot.register_next_step_handler(message, handle_screen)
 
 def done_review_st2(message):
     prev_mes = bot.send_message(message.chat.id, 'Укажите свое имя, под которым вы оставляли отзыв', reply_markup=cancel_markup())
@@ -117,18 +117,16 @@ def done_review_st4(message, user_name, prev_mes):
     mess = f'Ваше имя: <b>{user_name}</b>\n'\
             f'Артикул товара: <b><u>{ven_code}</u></b>\n'\
             'Все верно? Отправляем?'
-    base = sqlite3.connect('is_base.db')
-    cur = base.cursor()
-    is_review = cur.execute('SELECT review FROM users WHERE id_tg == ? AND ven_code == ?', (message.chat.id, ven_code)).fetchone()
-    if is_review:
-        if is_review[0]:
-            bot.send_message(message.chat.id, 'Вы уже оставляли отзыв об этом товаре', parse_mode = 'html')
-            base.close()
-            buttons(message)
-            return False
-    cur.execute('UPDATE users SET name == ?, ven_code == ? WHERE id_tg == ?', (user_name, ven_code, message.chat.id))
-    base.commit()
-    base.close()
+    with sqlite3.connect('is_base.db') as base:
+        cur = base.cursor()
+        is_review = cur.execute('SELECT review FROM users WHERE id_tg == ? AND ven_code == ?', (message.chat.id, ven_code)).fetchone()
+        if is_review:
+            if is_review[0]:
+                bot.send_message(message.chat.id, 'Вы уже оставляли отзыв об этом товаре', parse_mode = 'html')
+                buttons(message)
+                return False
+        cur.execute('UPDATE users SET name == ?, ven_code == ? WHERE id_tg == ?', (user_name, ven_code, message.chat.id))
+        base.commit()
     markup = types.InlineKeyboardMarkup(row_width = 2)
     yes = types.InlineKeyboardButton('Да', callback_data = 'send_review' + str(ven_code))
     no = types.InlineKeyboardButton('Изменить', callback_data = 'change_review')
@@ -138,18 +136,22 @@ def done_review_st4(message, user_name, prev_mes):
 
 ############################################################################################################################
 # ОТЛАВЛИВАЕМ СКРИНШОТЫ ОТ ПОЛЬЗОВАТЕЛЯ
-@bot.message_handler(content_types = ['photo'])
-def handle_screen(message):
-    bot.clear_step_handler_by_chat_id(chat_id=message.chat.id)
+# @bot.message_handler(content_types = ['photo'])
+def handle_screen(message, prev_mes = 0):
+    if prev_mes:
+        bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
+    if not message.photo:
+        prev_mes = bot.send_message(message.chat.id, 'Ожидается скриншот', parse_mode = 'html', reply_markup = cancel_markup())
+        bot.register_next_step_handler(message, handle_screen, prev_mes)
+        return False
     file_id = message.photo[-1].file_id
-    base = sqlite3.connect('is_base.db')
-    cur = base.cursor()
-    if (cur.execute('SELECT screenshot_id FROM users WHERE screenshot_id == ?', (file_id, )).fetchone()):
-        cur.execute('UPDATE users SET screenshot_id == ? WHERE id_tg == ?', (file_id, message.chat.id))
-    else:
-        cur.execute('INSERT INTO users(id_tg, screenshot_id) VALUES (?, ?)', (message.chat.id, file_id))
-    base.commit()
-    base.close()
+    with sqlite3.connect('is_base.db') as base:
+        cur = base.cursor()
+        if (cur.execute('SELECT id FROM users WHERE id_tg == ?', (message.chat.id, )).fetchone()):
+            cur.execute('UPDATE users SET screenshot_id == ? WHERE id_tg == ?', (file_id, message.chat.id))
+        else:
+            cur.execute('INSERT INTO users(id_tg, screenshot_id) VALUES (?, ?)', (message.chat.id, file_id))
+        base.commit()
     markup = types.InlineKeyboardMarkup(row_width = 1)
     ok = types.InlineKeyboardButton('✅Отправить', callback_data = 'send_screenshot')
     cancel = types.InlineKeyboardButton('❌Отмена', callback_data = 'cancel')
@@ -203,14 +205,13 @@ def issue_st4(message, user_name, ven_code, prev_mes):
             f'Артикул товара: <b><u>{ven_code}</u></b>\n\n'\
             f'Ваше сообщение:\n{issue_text}\n\n'\
             'Все верно? Отправляем?'
-    base = sqlite3.connect('is_base.db')
-    cur = base.cursor()
-    if cur.execute('SELECT id FROM users WHERE id_tg == ?', (message.chat.id,)).fetchone():
-        cur.execute('UPDATE users SET name == ?, ven_code == ?, issue == ? WHERE id_tg == ?', (user_name, ven_code, issue_text, message.chat.id))
-    else:
-        cur.execute('INSERT INTO users(id_tg, name, ven_code, issue) VALUES (?, ?, ?, ?)', (message.chat.id, user_name, ven_code, issue_text))
-    base.commit()
-    base.close()
+    with sqlite3.connect('is_base.db') as base:
+        cur = base.cursor()
+        if cur.execute('SELECT id FROM users WHERE id_tg == ?', (message.chat.id,)).fetchone():
+            cur.execute('UPDATE users SET name == ?, ven_code == ?, issue == ? WHERE id_tg == ?', (user_name, ven_code, issue_text, message.chat.id))
+        else:
+            cur.execute('INSERT INTO users(id_tg, name, ven_code, issue) VALUES (?, ?, ?, ?)', (message.chat.id, user_name, ven_code, issue_text))
+        base.commit()
     markup = types.InlineKeyboardMarkup(row_width = 2)
     yes = types.InlineKeyboardButton('Да', callback_data = 'send_issue')
     no = types.InlineKeyboardButton('Изменить', callback_data = 'change_issue')
