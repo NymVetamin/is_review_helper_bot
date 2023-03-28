@@ -128,7 +128,7 @@ def done_review_st4(message, user_name, prev_mes):
     bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
     if not ven_code:
         prev_mes = bot.send_message(message.chat.id, 'Ожидается артикул', parse_mode = 'html', reply_markup = cancel_markup())
-        bot.register_next_step_handler(message, done_review_st4, prev_mes)
+        bot.register_next_step_handler(message, done_review_st4, user_name, prev_mes)
         return False
     if not ven_code.isdecimal():
         prev_mes = bot.send_message(message.chat.id, 'Артикул должен состоять из цифр, повторите ввод', reply_markup=cancel_markup())
@@ -223,7 +223,7 @@ def issue_st3(message, user_name, prev_mes):
     bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
     if not ven_code:
         prev_mes = bot.send_message(message.chat.id, 'Ожидается артикул', parse_mode = 'html', reply_markup = cancel_markup())
-        bot.register_next_step_handler(message, issue_st3, prev_mes)
+        bot.register_next_step_handler(message, issue_st3, user_name, prev_mes)
         return False
     if not ven_code.isdecimal():
         prev_mes = bot.send_message(message.chat.id, 'Артикул должен состоять из цифр, повторите ввод', reply_markup=cancel_markup())
