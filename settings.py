@@ -1,2 +1,3 @@
-token = '6016655046:AAGCuh4jcIEwyaYFBKJE_an-AiVK1sQ0n5g'
+# token = '6016655046:AAGCuh4jcIEwyaYFBKJE_an-AiVK1sQ0n5g'
+token = '5399210931:AAHahF0u7DASb9QGvIWt59nFzpglVzja_j0'
 admin = 483561387

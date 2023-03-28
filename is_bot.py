@@ -7,7 +7,7 @@ bot = telebot.TeleBot(settings.token)
 
 ############################################################################################################################
 # СОЗДАНИЕ ГЛАВНОГО МЕНЮ
-def buttons(message):
+def buttons(message, cancel = False):
     markup = types.ReplyKeyboardMarkup(resize_keyboard = True, row_width = 1)
     issue = types.KeyboardButton('❔Вопрос по товару/доставке')
     want_review = types.KeyboardButton('Я бы хотела(а) оставить отзыв')
@@ -18,6 +18,8 @@ def buttons(message):
             'У вас есть вопросы или замечания по товару '\
             'или вы хотели бы получить кэшбек за оставленный отзыв?☺️\n\n'\
             'Выберите интересующее вас действие в меню ниже'
+    if cancel:
+        mess = 'Выберите интересующий вас раздел💬'
     bot.send_message(message.chat.id, mess, parse_mode = 'html', reply_markup = markup)
 
 ############################################################################################################################
@@ -27,7 +29,7 @@ def callback_handler(call):
     if call.data == 'cancel':
         bot.clear_step_handler_by_chat_id(chat_id=call.message.chat.id)
         bot.delete_message(call.message.chat.id, call.message.message_id)
-        buttons(call.message)
+        buttons(call.message, True)
 ############################################################################################################################
     elif call.data in ('send_screenshot', 'change_review'):
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -53,8 +55,8 @@ def callback_handler(call):
         bot.send_photo(settings.admin, data[2], caption = mess, parse_mode = 'html')
     elif call.data == 'change_screenshot':
         bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id, 'Выберите и отправьте другой скриншот сюда.')
-        bot.register_next_step_handler(call.message, handle_screen)
+        prev_mes = bot.send_message(call.message.chat.id, 'Выберите и отправьте другой скриншот сюда.', reply_markup=cancel_markup())
+        bot.register_next_step_handler(call.message, handle_screen, prev_mes)
     elif call.data == 'change_issue':
         bot.delete_message(call.message.chat.id, call.message.message_id)
         issue(call.message)
@@ -100,8 +102,8 @@ def done_review(message):
             'В Личном кабинете Wildberries все оставленные Вами отзывы можно найти в разделе "Профиль" ➡️ "Покупки".\n'\
             'В примере выше, Вы можете найти наглядную инструкцию, как найти отзыв, чтобы сделать скриншот.\n\n'\
             'Если вы сделали скриншот, отправьте его сюда.'
-    bot.send_message(message.chat.id, mess, parse_mode = 'html')
-    bot.register_next_step_handler(message, handle_screen)
+    prev_mes = bot.send_message(message.chat.id, mess, parse_mode = 'html', reply_markup=cancel_markup())
+    bot.register_next_step_handler(message, handle_screen, prev_mes)
 
 def done_review_st2(message):
     prev_mes = bot.send_message(message.chat.id, 'Укажите свое имя, под которым вы оставляли отзыв', reply_markup=cancel_markup())
@@ -109,17 +111,25 @@ def done_review_st2(message):
 
 def done_review_st3(message, prev_mes):
     user_name = message.text
+    bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
+    if not user_name:
+        prev_mes = bot.send_message(message.chat.id, 'Ожидается имя', parse_mode = 'html', reply_markup = cancel_markup())
+        bot.register_next_step_handler(message, done_review_st3, prev_mes)
+        return False
     mess = 'Введите артикул товара\n\n'\
             '▫️Как посмотреть?'\
             'В Личном кабинете Wildberries зайдите в разделе '\
             '"Профиль" ➡️ "Покупки". Нажмите на товар, чуть ниже вы найдете Артикул.'
-    bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
     prev_mes = bot.send_message(message.chat.id, mess, parse_mode = 'html', reply_markup = cancel_markup())
     bot.register_next_step_handler(message, done_review_st4, user_name, prev_mes)
 
 def done_review_st4(message, user_name, prev_mes):
     ven_code = message.text
     bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
+    if not ven_code:
+        prev_mes = bot.send_message(message.chat.id, 'Ожидается артикул', parse_mode = 'html', reply_markup = cancel_markup())
+        bot.register_next_step_handler(message, done_review_st4, prev_mes)
+        return False
     if not ven_code.isdecimal():
         prev_mes = bot.send_message(message.chat.id, 'Артикул должен состоять из цифр, повторите ввод', reply_markup=cancel_markup())
         bot.register_next_step_handler(message, done_review_st4, user_name, prev_mes)
@@ -151,10 +161,8 @@ def done_review_st4(message, user_name, prev_mes):
 
 ############################################################################################################################
 # ОТЛАВЛИВАЕМ СКРИНШОТЫ ОТ ПОЛЬЗОВАТЕЛЯ
-# @bot.message_handler(content_types = ['photo'])
-def handle_screen(message, prev_mes = 0):
-    if prev_mes:
-        bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
+def handle_screen(message, prev_mes):
+    bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
     if not message.photo:
         prev_mes = bot.send_message(message.chat.id, 'Ожидается скриншот', parse_mode = 'html', reply_markup = cancel_markup())
         bot.register_next_step_handler(message, handle_screen, prev_mes)
@@ -198,17 +206,25 @@ def issue(message):
 
 def issue_st2(message, prev_mes):
     user_name = message.text
+    bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
+    if not user_name:
+        prev_mes = bot.send_message(message.chat.id, 'Ожидается имя', parse_mode = 'html', reply_markup = cancel_markup())
+        bot.register_next_step_handler(message, issue_st2, prev_mes)
+        return False
     mess = 'Введите артикул товара\n\n'\
             '▫️Как посмотреть?'\
             'В Личном кабинете Wildberries зайдите в разделе '\
             '"Профиль" ➡️ "Покупки". Нажмите на товар, чуть ниже вы найдете Артикул.'
-    bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
     prev_mes = bot.send_message(message.chat.id, mess, parse_mode = 'html', reply_markup=cancel_markup())
     bot.register_next_step_handler(message, issue_st3, user_name, prev_mes)
 
 def issue_st3(message, user_name, prev_mes):
     ven_code = message.text
     bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
+    if not ven_code:
+        prev_mes = bot.send_message(message.chat.id, 'Ожидается артикул', parse_mode = 'html', reply_markup = cancel_markup())
+        bot.register_next_step_handler(message, issue_st3, prev_mes)
+        return False
     if not ven_code.isdecimal():
         prev_mes = bot.send_message(message.chat.id, 'Артикул должен состоять из цифр, повторите ввод', reply_markup=cancel_markup())
         bot.register_next_step_handler(message, issue_st3, user_name, prev_mes)
@@ -221,6 +237,10 @@ def issue_st3(message, user_name, prev_mes):
 def issue_st4(message, user_name, ven_code, prev_mes):
     issue_text = message.text
     bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=prev_mes.message_id, reply_markup=None)
+    if not issue_text:
+        prev_mes = bot.send_message(message.chat.id, 'Ожидается текстовая информация', reply_markup=cancel_markup())
+        bot.register_next_step_handler(message, issue_st4, user_name, ven_code, prev_mes)
+        return False
     mess = f'Ваше имя: <b>{user_name}</b>\n'\
             f'Артикул товара: <b><u>{ven_code}</u></b>\n\n'\
             f'Ваше сообщение:\n{issue_text}\n\n'\
@@ -246,7 +266,7 @@ def issue_st4(message, user_name, ven_code, prev_mes):
 
 ############################################################################################################################
 # ОТЛАВЛИВАЕМ ТЕКСТОВЫЕ СООБЩЕНИЯ ОТ ПОЛЬЗОВАТЕЛЯ
-@bot.message_handler(content_types = ['text'])
+@bot.message_handler()
 def check_messages(message):
     if message.text == '❔Вопрос по товару/доставке':
         issue(message)
