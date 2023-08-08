@@ -8,8 +8,13 @@
 </ul>
 <h2>Ниже можно ознакомиться со скриншотами работы</h2>
 <div>
-  <img src="/docs/IMG_5211.JPEG" alt="Events info" width="24%" height="24%" align="top"/>
-  <img src="/docs/IMG_5204.JPEG" alt="Events info" width="24%" height="24%" align="top"/>
-  <img src="/docs/IMG_5205.JPEG" alt="Events info" width="24%" height="24%" align="top"/>
-  <img src="/docs/IMG_5206.JPEG" alt="Events info" width="24%" height="24%" align="top"/>
+  <img src="/docs/IMG_5218.JPEG" width="24%" height="24%" align="top"/>
+  <img src="/docs/IMG_5219.JPEG" width="24%" height="24%" align="top"/>
+  <img src="/docs/IMG_5220.JPEG" width="24%" height="24%" align="top"/>
+  <img src="/docs/IMG_5221.JPEG" width="24%" height="24%" align="top"/>
+</div>
+<p></p>
+<div>
+  <img src="/docs/IMG_5223.JPEG" width="24%" height="24%" align="top"/>
+  <img src="/docs/IMG_5224.JPEG" width="24%" height="24%" align="top"/>
 </div>
